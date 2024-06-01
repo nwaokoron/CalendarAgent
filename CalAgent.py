@@ -1,6 +1,7 @@
 
 import datetime
 from entities import EventDetails
+import datetimeUtil
 import vertexai
 from vertexai.generative_models import (
     Content,
@@ -10,21 +11,6 @@ from vertexai.generative_models import (
     Part,
     Tool,
 )
-
-# Specify a function declaration and parameters for an API request
-# get_calendar_events = "get_calendar_events"
-
-# get_product_sku_func = FunctionDeclaration(
-#     name=get_product_sku,
-#     description="Get the SKU for a product",
-#     # Function parameters are specified in OpenAPI JSON schema format
-#     parameters={
-#         "type": "object",
-#         "properties": {
-#             "product_name": {"type": "string", "description": "Product name"}
-#         },
-#     },
-# )
 
 
 class CalAgent:
@@ -76,7 +62,7 @@ class CalAgent:
 
         self.model = GenerativeModel(
             model_name="gemini-1.5-pro-preview-0514",
-            generation_config=GenerationConfig(temperature=0.42),
+            generation_config=GenerationConfig(temperature=0.0),
             tools=[calendar_tools],
         )
         
@@ -114,6 +100,11 @@ class CalAgent:
 
            
             response = chat.send_message(prompt)
+            print(response.candidates)
+            if len(response.candidates) == 0:
+                print("something went wrong, please try again")
+                continue
+
             function_call = response.candidates[0].function_calls[0]
             print(function_call)
             api_response = self.process_function_call(function_call)
@@ -134,13 +125,32 @@ class CalAgent:
     def process_function_call(self, function_call): 
         if function_call.name == "get_calendar_events":
             number_of_events = function_call.args["number_of_events"]
-            print(f"Number of events: {number_of_events}")
             return self.get_calendar_events(number_of_events)
         elif function_call.name == "create_calendar_event":
-            event_name = function_call.args["event_name"]
-            start_time = function_call.args["start_time"]
-            end_time = function_call.args["end_time"]
-            location = function_call.args["location"]
+            event_name = None
+            start_time = None
+            end_time = None
+            location = None
+
+            if "event_name" in function_call.args:
+                event_name = function_call.args["event_name"]    
+            else:
+                event_name = "New Event"
+            if "start_time" in function_call.args: 
+                start_time = function_call.args["start_time"]
+            else:
+                start_time = str(datetime.datetime.now()) # this a hack. a better solution is find the next available time of the user's calendar
+            print(f"Event name: {event_name}, Start time: {start_time}")
+            if "end_time" in function_call.args:
+                end_time = function_call.args["end_time"]
+            else:
+                time_ref = datetimeUtil.str_to_datetime(start_time)
+                end_time = str(datetimeUtil.add_one_hr(time_ref)).replace(" ", "T")
+            print(f"Event name: {event_name}, End time: {end_time}")
+            if "location" in function_call.args:
+                location = function_call.args["location"]
+            else:
+                location = "Not specified"
             print(f"Event name: {event_name}, Start time: {start_time}, End time: {end_time}, Location: {location}")
             event_details = EventDetails(event_name, start_time, end_time, location)
             return self.create_calendar_event(event_details)

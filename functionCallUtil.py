@@ -10,3 +10,6 @@ def extract_function_calls(response: GenerationResponse) -> List[Dict]:
                 function_call_dict[function_call.name][key] = value
             function_calls.append(function_call_dict)
     return function_calls
+
+def extract_function_call_names(response: GenerationResponse) -> List[str]:
+    pass
